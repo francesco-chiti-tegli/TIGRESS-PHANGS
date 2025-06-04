@@ -1,3 +1,12 @@
+time_cf = (u.time).to(units.Gyr).value
+mass_cf = (s.u.mass).to(units.M_sun).value
+density_cf = (s.u.density).to(units.M_sun / units.pc**3).value
+number_density_cf = (units.cm**-3).to(units.pc**-3)
+
+solar_metallicity = 0.0134
+dust_to_gas_ratio = 0.01
+h_alpha_energy = 3.03e-12 # (erg)
+
 
 for snapshot_number in snapshot_indexes_to_export:
     print('Snapshot number ' + str(snapshot_number) + ' at time ' + str(s.nums[snapshot_number]) + ' Myr')
