@@ -44,6 +44,8 @@ solar_metallicity = 0.0134
 dust_to_gas_ratio = 0.01
 h_alpha_wave = 0.65628 # (micron)
 h_alpha_energy = 3.03e-12 # (erg)
+h_beta_wave = 0.48613 # (micron)
+h_beta_energy = 4.09e-12 # (erg)
 H_mass = 8.41e-58 # (Msun)
 H_mass_grams = 1.67e-24 # (grams)
 
@@ -136,7 +138,7 @@ print('Number of cells: ' + str(Nx_exp))
 # (-256 < x3 < 256 /// 704 < Nx[3] < 832) YES
 
 # In the list snapshots_fields, every first entry corresponds to the snapshot number, starting from "beginning"
-# Then, inside there is a list with the following entries: (0) electron density, (1) temperature, (2) gas_density, (3) HI_num_density
+# Then, inside there is a list with the following entries: (0) electron density, (1) temperature, (2) gas_density, (3) HI_num_density, (4) proton density
 
 # In the list snaphsots_stars, every first entry corresponds to the snapshot number, starting from "beginning"
 # Then, inside there is an array with the stars in each snapshot
@@ -153,11 +155,13 @@ for snapshot_number in snapshot_indexes_to_export:
     temperature = ds.get_field('T')
     gas_density = ds.get_field('rho')
     HI_num_density = ds.get_field('nHI')
+    proton_density = ds.get_field('nHII')
     # And then SPExpand
     electron_density_exp = expand_xy(s,electron_density)
     temperature_exp = expand_xy(s,temperature)
     gas_density_exp = expand_xy(s,gas_density)
     HI_num_density_exp = expand_xy(s,HI_num_density)
+    proton_density_exp = expand_xy(s,proton_density)
     print('Finished expanding fields in the snapshot number ' + str(snapshot_number))
 
     # The stars
@@ -241,7 +245,7 @@ for snapshot_number in snapshot_indexes_to_export:
     stars_array_exp = np.array(stars_array_exp)
     
     # Putting everything inside the array for SFH snapshots
-    snapshots_fields.append([electron_density_exp, temperature_exp, gas_density_exp, HI_num_density_exp])
+    snapshots_fields.append([electron_density_exp, temperature_exp, gas_density_exp, HI_num_density_exp, proton_density_exp])
     snaphsots_stars.append(stars_array_exp)
     print('Finished exporting snapshot number ' + str(snapshot_number))
     print()
@@ -274,6 +278,7 @@ for indx, snapshot_number in enumerate(snapshot_indexes_to_export):
     print('NEW SNAPSHOT! Processing snapshot number ' + str(snapshot_number) + ', with relative index ' + str(indx))
     Halfa_array = []
     SED_array = []
+    Hbeta_array = []
     old_disk_array = []
     dust_array = []
     hydrogen_array = []
@@ -290,47 +295,52 @@ for indx, snapshot_number in enumerate(snapshot_indexes_to_export):
                 ymax_val = ymax_exp[j]
                 zmax_val = zmax_exp[k]
                 
-                dust_density_val = (snapshots_fields[indx][2]['rho'].data)[k, j, i].astype(np.float64) * dust_to_gas_ratio
-                temperature_val = (snapshots_fields[indx][1]['T'].data)[k, j, i].astype(np.float64)
-                HI_ndens_val = (snapshots_fields[indx][3]['nHI'].data)[k, j, i].astype(np.float64)
-                metallicities_val = solar_metallicity * 0.03
+                #dust_density_val = (snapshots_fields[indx][2]['rho'].data)[k, j, i].astype(np.float64) * dust_to_gas_ratio
+                #temperature_val = (snapshots_fields[indx][1]['T'].data)[k, j, i].astype(np.float64)
+                #HI_ndens_val = (snapshots_fields[indx][3]['nHI'].data)[k, j, i].astype(np.float64)
+                #metallicities_val = solar_metallicity * 0.03
                 
                 ne2 = (snapshots_fields[indx][0]['ne'].data)[k, j, i].astype(np.float64)
                 T_4 = (snapshots_fields[indx][1]['T'].data)[k, j, i].astype(np.float64) / 1e4
-                h_alpha_luminosity_val = h_alpha_energy * (1.17e-13 / (4*np.pi)) * (T_4**(-0.942-0.030*np.log(T_4))) * (ne2**2 * number_density_cf * volume)
+                pe2 = (snapshots_fields[indx][4]['nHII'].data)[k, j, i].astype(np.float64)
+                #h_alpha_luminosity_val = h_alpha_energy * (1.17e-13) * (T_4**(-0.942-0.030*np.log(T_4))) * (ne2 * pe2 * number_density_cf * volume)
+                h_beta_luminosity_val = h_beta_energy * (3.03e-14) * (T_4**(-0.874-0.058*np.log(T_4))) * (ne2 * pe2 * number_density_cf * volume)
                 
-                hydrogen_density_val = (HI_ndens_val) * H_mass_grams
-                H_surf_val = hydrogen_density_val * (units.g).to(units.M_sun) * number_density_cf * 4.0
-                HI_prefattore = (3/4) * 2.8843e-15 * 6.62e-27 * 3.0e8 / 21e-2
-                HI_lum_val = HI_prefattore * HI_ndens_val * number_density_cf * volume
+                #hydrogen_density_val = (HI_ndens_val) * H_mass_grams
+                #H_surf_val = hydrogen_density_val * (units.g).to(units.M_sun) * number_density_cf * 4.0
+                #HI_prefattore = (3/4) * 2.8843e-15 * 6.62e-27 * 3.0e8 / 21e-2
+                #HI_lum_val = HI_prefattore * HI_ndens_val * number_density_cf * volume
                 
-                star_disk_mass_val = mean_density_star_disk(xmin_val, ymin_val, zmin_val, xmax_val, ymax_val, zmax_val) * volume
+                #star_disk_mass_val = mean_density_star_disk(xmin_val, ymin_val, zmin_val, xmax_val, ymax_val, zmax_val) * volume
                 
-                Halfa_array.append([xmin_val, ymin_val, zmin_val, xmax_val, ymax_val, zmax_val, ID_number, dust_density_val])
-                SED_array.append([h_alpha_wave, h_alpha_luminosity_val, ID_number])
-                dust_array.append([xmin_val, ymin_val, zmin_val, xmax_val, ymax_val, zmax_val, dust_density_val, temperature_val])          
-                hydrogen_array.append([xmin_val, ymin_val, zmin_val, xmax_val, ymax_val, zmax_val, hydrogen_density_val, metallicities_val, temperature_val, H_surf_val, HI_lum_val])
-                old_disk_array.append([xmin_val, ymin_val, zmin_val, xmax_val, ymax_val, zmax_val, star_disk_mass_val, solar_metallicity, 9.99])
+                #Halfa_array.append([xmin_val, ymin_val, zmin_val, xmax_val, ymax_val, zmax_val, ID_number, dust_density_val])
+                #SED_array.append([h_alpha_wave, h_alpha_luminosity_val, ID_number])
+                Hbeta_array.append([h_beta_wave, h_beta_luminosity_val, ID_number])
+                #dust_array.append([xmin_val, ymin_val, zmin_val, xmax_val, ymax_val, zmax_val, dust_density_val, temperature_val])          
+                #hydrogen_array.append([xmin_val, ymin_val, zmin_val, xmax_val, ymax_val, zmax_val, hydrogen_density_val, metallicities_val, temperature_val, H_surf_val, HI_lum_val])
+                #old_disk_array.append([xmin_val, ymin_val, zmin_val, xmax_val, ymax_val, zmax_val, star_disk_mass_val, solar_metallicity, 9.99])
                 ID_number = ID_number + 1
 
     print("Final ID_Number: " + str(ID_number))
-    Halfa_array = np.array(Halfa_array)
-    SED_array = np.array(SED_array)
-    dust_array = np.array(dust_array)
-    hydrogen_array = np.array(hydrogen_array)
-    old_disk_array = np.array(old_disk_array)
-                
+
+    #Halfa_array = np.array(Halfa_array)
+    #SED_array = np.array(SED_array)
+    Hbeta_array = np.array(Hbeta_array)
+    #dust_array = np.array(dust_array)
+    #hydrogen_array = np.array(hydrogen_array)
+    #old_disk_array = np.array(old_disk_array)
+    '''  
     print('Total mass analitically computed: ' + str(9 * 1024 * 1024 * 42 * 512 / np.sqrt(512**2 + 245**2)) + ' Msun')
     print('Total mass computed as mean density * volume * number cells: ' + str(np.mean(old_disk_array[:,6]) * (Nx[0] * Nx[1] * (max_height-min_height) * 9)) + ' Msun')
     print('Difference An - Num: ' + str((9 * 1024 * 1024 * 42 * 512 / np.sqrt(512**2 + 245**2)) - (np.mean(old_disk_array[:,6]) * (Nx[0] * Nx[1] * (max_height-min_height) * 9))) + ' Msun')
     print('Average metallicity: ' + str(np.mean(old_disk_array[:,7])))
-
+    '''
     #######################################################################################################################
 
     true_output = output_dir_exp_history + 'Snap' + str(snapshot_number) + '/'
 
     #######################################################################################################################
-    
+    '''
     fmt_Halfa = ["%g", "%g", "%g", "%g", "%g", "%g", "%d", "%g"]
     header = """# Halfa_Ridotto_exp.txt: import file for cell source -- Halfa
     # Column 1: xmin (pc)
@@ -365,7 +375,7 @@ for indx, snapshot_number in enumerate(snapshot_indexes_to_export):
         np.savetxt(txt_file, dust_array, fmt="%g")
     
     ########################################################################################################################
-    '''
+
     header = """# Hydrogen_21_Ridotto_ConEmissione_exp.txt: import file for cell media -- gas
     # Column 1: xmin (pc)
     # Column 2: ymin (pc)
@@ -383,7 +393,7 @@ for indx, snapshot_number in enumerate(snapshot_indexes_to_export):
     with open(f"{true_output}Hydrogen_21_Ridotto_ConEmissione_exp.txt", "w") as txt_file:
         txt_file.write(header)
         np.savetxt(txt_file, hydrogen_array, fmt="%g")
-    '''
+
 
     image_HI = np.sum((hydrogen_array[:, 10]).reshape(768, 768, 384), axis=-1).transpose()[256:512,256:512]
     surf_dens_HI = np.sum((hydrogen_array[:, 9]).reshape(768, 768, 384), axis=-1).transpose()[256:512,256:512]
@@ -439,7 +449,7 @@ for indx, snapshot_number in enumerate(snapshot_indexes_to_export):
     print('Finished saving arrays for snapshot number ' + str(snapshot_number) + ' in ' + str(true_output))
 
     ########################################################################################################################
-
+    '''
     from pts.storedtable.io import writeStoredTable
     from pts.storedtable.io import readStoredTable
     def convertMonochromaticSimulation(wavelengths, luminosities, indexes, outFilePath):
@@ -453,9 +463,22 @@ for indx, snapshot_number in enumerate(snapshot_indexes_to_export):
         L[1, :] = luminosities_per_micron / 0.657e-6
 
         writeStoredTable(outFilePath,['lambda', 'index'], ['m', '1'], ['lin', 'lin'],[w*1e-6, ID],['Llambda'], ['W/m'], ['lin'], [L])
-    convertMonochromaticSimulation(SED_array[:,0], SED_array[:,1], SED_array[:,2].astype(int), f"{true_output}SEDfamily_Ridotto_exp.stab")
-    readStoredTable(f"{true_output}SEDfamily_Ridotto_exp.stab")
+    #convertMonochromaticSimulation(SED_array[:,0], SED_array[:,1], SED_array[:,2].astype(int), f"{true_output}SEDfamily_Ridotto_exp.stab")
+    #readStoredTable(f"{true_output}SEDfamily_Ridotto_exp.stab")
 
+    def convertMonochromaticSimulation_2(wavelengths, luminosities, indexes, outFilePath):
+        erg_to_watt = 1e-7
+        luminosities_per_micron = luminosities * erg_to_watt
+        w = np.array([0.486, 0.487])
+
+        ID = indexes
+        L = np.zeros((len(w), len(luminosities_per_micron)))
+        L[0, :] = luminosities_per_micron / 0.486e-6
+        L[1, :] = luminosities_per_micron / 0.487e-6
+
+        writeStoredTable(outFilePath,['lambda', 'index'], ['m', '1'], ['lin', 'lin'],[w*1e-6, ID],['Llambda'], ['W/m'], ['lin'], [L])
+    convertMonochromaticSimulation_2(Hbeta_array[:,0], Hbeta_array[:,1], Hbeta_array[:,2].astype(int), f"{true_output}HbetaSED_Ridotto_exp.stab")
+    readStoredTable(f"{true_output}HbetaSED_Ridotto_exp.stab")
     ########################################################################################################################
 
     print('Finished snapshot number ' + str(snapshot_number) + ', with relative index ' + str(indx))
